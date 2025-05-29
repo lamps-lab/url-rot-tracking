@@ -321,6 +321,6 @@ numProcessed = 0
 unprocessed_files = []
 if __name__ == "__main__":
     core_count = 10 #however many cores you want to use
-    root_path3 = 'D:/pmcs0/allofploscopy/output_10'
-    csv_file_name3 = "marchURLs_10"
+    root_path3 = ''
+    csv_file_name3 = ""
     process_files(root_path3, core_count, csv_file_name3)
