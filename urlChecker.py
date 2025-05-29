@@ -129,8 +129,8 @@ url_semaphore = BoundedSemaphore(8)
 numChecked = 0
 if __name__ == "__main__":
     core_count = 8
-    root = "D:/pmcs0"
-    folder = "marchURLs"
+    root = "" #root path
+    folder = "" #path to folder containing URLs
     file_path = os.path.join(root, folder)
-    csv_file_name = "mayURLs"
+    csv_file_name = "" #name of new file to store response codes
     process_urls(file_path, core_count, csv_file_name)
