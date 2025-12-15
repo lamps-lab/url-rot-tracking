@@ -9,56 +9,9 @@ import re
 import os
 import xml.etree.ElementTree as ET
 
-#Scan XML files to find dates of publication
-
-
-def is_connected_via_wifi(): #Check if machine is properly connected to the internet along with has_internet_connection and is_fully_connected (unnecessary if internet connection is guaranteed)
-    try:
-        output = subprocess.check_output("netsh wlan show interfaces", shell=True, text=True, stderr=subprocess.DEVNULL)
-        match = re.search(r"^\s*State\s*:\s*(\w+)", output, re.MULTILINE)
-        if match:
-            return match.group(1).lower() == "connected"
-        return False
-    except subprocess.CalledProcessError:
-        return False
-    
-def has_internet_connection(host="8.8.8.8", port=53, timeout=3):
-    """
-    Attempts to connect to a public DNS server to verify internet access.
-    Default is Google DNS at 8.8.8.8:53.
-    """
-    try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except socket.error:
-        return False
-    
-def is_fully_connected():
-    return has_internet_connection() and is_connected_via_wifi()
-
-def retrieve_date(filename, doi): #Retrieve publication dates via Crossref
-    global failed
-    while not is_connected_via_wifi():
-        time.sleep(0.5)
-    try:
-        works = Works()
-        info = works.doi(doi)
-        title = info['title'][0]
-        issued_date = info['issued']['date-parts'][0]
-        created_date = info['created']['date-parts'][0]
-        dataframe = pd.DataFrame({"File": [filename], "Title": [title], "IssuedDate": [issued_date], "CreatedDate": [created_date]})
-        return dataframe
-    except Exception as e:
-        print(e)
-        dataframe = pd.DataFrame({"File": [filename], "Title": [e], "IssuedDate": [{}], "CreatedDate": [{}]})
-        failed += 1
-        return dataframe
-
 
 count = 0
 failed = 0
-temp = 0
 csv_file_name = 'PLoSDates2.csv'
 dois_file = 'D:/pmcs0/PLoSDOIs.csv'
 
@@ -101,6 +54,7 @@ if __name__ == '__main__':
         count += 1
     print([count, failed])
     print(years_dict)
+
 
 
     
