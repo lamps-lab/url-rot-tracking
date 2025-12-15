@@ -57,7 +57,7 @@ limit = 95000
 failed = 0
 csv_file_name = "PLoSDomains.csv"
 domains_file = "D:/pmcs0/PLoSDOIs.csv"
-start_index = 0 #use multiples of 100000 since OpenAlex has a limit of 100000 calls per day
+start_index = 0 #use multiples of limit since OpenAlex has a limit of 100000 calls per day
 if __name__ == '__main__':
     rows = []
     count = 0
@@ -75,3 +75,4 @@ if __name__ == '__main__':
     print(f"Crawl completed from index {start_index} to {start_index+limit} of {domains_file}")
 
     
+
