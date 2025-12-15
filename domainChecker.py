@@ -56,12 +56,12 @@ def retrieve_info(filename, doi):
 limit = 95000
 failed = 0
 csv_file_name = "PLoSDomains.csv"
-domains_file = "D:/pmcs0/PLoSDOIs.csv"
+dois_file = "D:/pmcs0/PLoSDOIs.csv"
 start_index = 0 #use multiples of limit since OpenAlex has a limit of 100000 calls per day
 if __name__ == '__main__':
     rows = []
     count = 0
-    with open(domains_file, newline = '', encoding = 'utf-8') as file:
+    with open(dois_file, newline = '', encoding = 'utf-8') as file:
         reader = csv.reader(file)
         for row in reader:
             rows.append(row)
@@ -72,7 +72,8 @@ if __name__ == '__main__':
         dataframe.to_csv(csv_file_name, mode='a', header=False, index=False)
         count += 1
     print(f"{failed} requests failed")
-    print(f"Crawl completed from index {start_index} to {start_index+limit} of {domains_file}")
+    print(f"Crawl completed from index {start_index} to {start_index+limit} of {dois_file}")
 
     
+
 
