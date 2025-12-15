@@ -7,7 +7,7 @@ import socket
 import re
 import time
 import datetime as dt
-config.email = 'pmcs022@gmail.com'
+config.email = '_@_.com'
 
 #Use OpenAlex API to collect Topic modules for PLoS works based on DOIs
 
@@ -73,4 +73,5 @@ if __name__ == '__main__':
         count += 1
     print(f"{failed} requests failed")
     print(f"Crawl completed from index {start_index} to {start_index+limit} of {domains_file}")
+
     
