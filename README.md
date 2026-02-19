@@ -41,7 +41,7 @@ Instructions: Set url_codes_topics_file to the urlsCodesTopics.csv file, which i
 
 
 **urlChecker.py**:
-Crawls all the URLs contained within marchURLs for response codes and error messages and records it to a new CSV file. During this project, initial URL collection done with plosCheckerFinal.py was done in 10 separate files due to computational constraints, which is why marchURLs is separated into 10 files. The response codes we collected in March were not used in this project; we used response codes collected in May. Uses multiprocessing to speed up the process and prevent stalling.
+Crawls all the URLs contained within marchURLs for response codes and error messages and records it to a new CSV file. During this project, initial URL collection done with plosCheckerFinal.py was done in 10 separate files due to computational constraints, which is why marchURLs is separated into 10 files. The response codes we collected in March were not used in this project; we used response codes collected in April. It is intended that each URL crawl is done with the results of the previous crawl. This should produce one 2 million row CSV file with URLs and error response codes. Uses multiprocessing and threads to speed up the process and prevent stalling. This script is built to use Windows: Linux and OSX may terminate the script and render it unusable for that run. 
 
 Instructions: Set core_count to the amount of cores you wish to use to perform multiprocessing operations. Set root to the parent folder of the marchURLs folder, which is the parent folder of the marchURLs_# folders, each of which holds one marchURLs_# CSV file. Set folder to the marchURLs folder. Set csv_file_name to your desired output CSV file.
 
