@@ -102,9 +102,9 @@ def process_urls(root_path, thread_count, csv_name):
 
 
 if __name__ == "__main__":
-    core_count = 8
+    thread_count = 64  # Reduced from 128 to lower concurrent memory pressure
     root = "" #root path
     folder = "" #path to folder containing URLs
     file_path = os.path.join(root, folder)
     csv_file_name = "" #name of new file to store response codes
-    process_urls(file_path, core_count, csv_file_name)
+    process_urls(file_path, thread_count, csv_file_name)
