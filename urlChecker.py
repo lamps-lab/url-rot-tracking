@@ -2,131 +2,105 @@ import os
 import requests
 import time
 import datetime as dt
-from requests.exceptions import ConnectionError, Timeout, ProxyError
-from urllib3.exceptions import NewConnectionError, MaxRetryError, ReadTimeoutError, ConnectTimeoutError
-import threading
-from nltk.tokenize import sent_tokenize
-import multiprocessing
-from multiprocessing import BoundedSemaphore
-from functools import partial
-import gc
 import pandas as pd
 import csv
-import re
-import socket
-import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib3.exceptions import NewConnectionError, MaxRetryError, ReadTimeoutError, ConnectTimeoutError
+from requests.exceptions import ConnectionError, Timeout
 
-
-def is_connected_via_wifi():
-    try:
-        output = subprocess.check_output("netsh wlan show interfaces", shell=True, text=True, stderr=subprocess.DEVNULL)
-        # Check if "State" is "connected"
-        match = re.search(r"^\s*State\s*:\s*(\w+)", output, re.MULTILINE)
-        if match:
-            return match.group(1).lower() == "connected"
-        return False
-    except subprocess.CalledProcessError:
-        return False
-    
-def has_internet_connection(host="8.8.8.8", port=53, timeout=3):
-    """
-    Attempts to connect to a public DNS server to verify internet access.
-    Default is Google DNS at 8.8.8.8:53.
-    """
-    try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except socket.error:
-        return False
-    
-def is_fully_connected():
-    return has_internet_connection() and is_connected_via_wifi()
-
+# Custom exception (kept for completeness, though not used in this version)
 class AbsoluteTimeoutError(Exception):
     def __init__(self):
         super().__init__()
-def kill_request():
-    raise AbsoluteTimeoutError
 
-def tryURL(url):
-    while not is_fully_connected():
-        time.sleep(0.5)
-    with url_semaphore:
+def tryURL(row):
+    if len(row) >= 2 and all(cell.strip() for cell in row[:2]):
+        filename, url = row[0], row[1]
         try:
             response = requests.get(url, timeout=7.5)
-            return False, response.status_code, ""
-        except requests.exceptions.ConnectionError as e:
-            if isinstance(e.__cause__, NewConnectionError):
-                return True, 601, e
-            elif isinstance(e.__cause__, MaxRetryError):
-                return True, 602, e
-            elif isinstance(e.__cause__, ReadTimeoutError):
-                return True, 603, e
-            elif isinstance(e.__cause__, ConnectTimeoutError):
-                return True, 604, e
-            else:
-                return True, 605, e
-        except requests.exceptions.Timeout as e:
-            if isinstance(e.__cause__, ReadTimeoutError):
-                return True, 701, e
-            elif isinstance(e.__cause__, ConnectTimeoutError):
-                return True, 702, e
-            else:
-                return True, 703, e
+            return filename, url, response.status_code, ""
+        except ConnectionError as e:
+            return filename, url, 600 + _get_error_code(e), str(e)
+        except Timeout as e:
+            return filename, url, 700 + _get_error_code(e), str(e)
         except requests.exceptions.TooManyRedirects as e:
-            return True, 800, e
+            return filename, url, 800, str(e)
         except AbsoluteTimeoutError:
-            return True, 900, e
+            return filename, url, 900, "Absolute timeout"
         except Exception as e:
-            return True, 1000, e
-        finally:
-            gc.collect() 
-
-def scanURL(row):
-    if row:
-        filename = row[0]
-        url = row[1]
-        status, code, error = tryURL(url)
-        if status:   
-            dataframe = pd.DataFrame({"File": [filename], "URL": [url], "Status": [code], "ErrorMessage": [error]})
-        else:
-            dataframe = pd.DataFrame({"File": [filename], "URL": [url], "Status": [code], "ErrorMessage": ""})
-        return True, dataframe
+            return filename, url, 1000, str(e)
     else:
-        return False, pd.DataFrame()
-        
+        return None
 
-def process_urls(root_path, core_count, csv_name):
-    global numChecked
-    absolute_start_time, update_start_time = time.time(), time.time()
-    files = [os.path.join(root_path, f) for f in os.listdir(root_path) if os.path.isfile(os.path.join(root_path,f))] #set up files to be scanned
-    numRows = 0
+def _get_error_code(e):
+    if isinstance(e.__cause__, NewConnectionError):
+        return 1
+    elif isinstance(e.__cause__, MaxRetryError):
+        return 2
+    elif isinstance(e.__cause__, ReadTimeoutError):
+        return 3
+    elif isinstance(e.__cause__, ConnectTimeoutError):
+        return 4
+    else:
+        return 5
+
+def process_urls(root_path, thread_count, csv_name):
+    absolute_start_time = time.time()
+    update_start_time = time.time()
+    files = [os.path.join(root_path, f) for f in os.listdir(root_path) if os.path.isfile(os.path.join(root_path, f))]
+    total_checked = 0
+    total_rows = 0
+    batch_results = []
+    batch_size = 100  # Flush every 100 results
+    output_path = f"{csv_name}.csv"
+
+    # Remove existing output file if present (to ensure clean header)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
     for file in files:
-        rows = []
         print(f"**********[{dt.datetime.now().time()}] Processing {file}")
-        with open(file, 'r', encoding = 'utf-8') as csvfile:
+        with open(file, 'r', encoding='utf-8', newline='') as csvfile:
             csvreader = csv.reader(csvfile)
+            total_rows_in_file = 0
             for row in csvreader:
-                rows.append(row)
-            numRows += len(rows)
-            with multiprocessing.Pool(processes = core_count) as pool:
-                for status, dataframe in pool.imap_unordered(scanURL, rows):
-                    if status:
-                        dataframe.to_csv(f"{csv_name}.csv", index = False, mode = 'a', header = False)
-                        numChecked += 1
-                    if numChecked % 100 == 0:
-                        print(f"[{dt.datetime.now().time()}] URLs {numChecked-99} - {numChecked} out of {numRows} tried in {round(time.time()-update_start_time, 5)} seconds; runtime so far: {round((time.time()-absolute_start_time)/3600, 5)} hours ({file})")
-                        update_start_time = time.time()
-        gc.collect()
+                if len(row) >= 2 and all(cell.strip() for cell in row[:2]):
+                    total_rows_in_file += 1
+            total_rows += total_rows_in_file
+            print(f"**********[{dt.datetime.now().time()}] {total_rows_in_file} valid URLs found in {file}")
+
+        # Re-open to process with threads
+        with open(file, 'r', encoding='utf-8', newline='') as csvfile:
+            csvreader = csv.reader(csvfile)
+
+            with ThreadPoolExecutor(max_workers=thread_count) as executor:
+                future_to_row = {executor.submit(tryURL, row): row for row in csvreader if len(row) >= 2 and all(cell.strip() for cell in row[:2])}
+
+                for future in as_completed(future_to_row):
+                    result = future.result()
+                    if result:
+                        batch_results.append(result)
+                        total_checked += 1
+
+                        # Flush batch if reached size limit
+                        if len(batch_results) >= batch_size:
+                            df = pd.DataFrame(batch_results, columns=["File", "URL", "Status", "ErrorMessage"])
+                            df.to_csv(output_path, index=False, mode='a', header=not os.path.exists(output_path))
+                            batch_results = []
+
+                            print(f"[{dt.datetime.now().time()}] URLs {total_checked - batch_size + 1} - {total_checked} out of {total_rows} tried in {round(time.time() - update_start_time, 2)} seconds; runtime so far: {round((time.time() - absolute_start_time) / 3600, 3)} hours")
+                            update_start_time = time.time()
+
         print(f"**********[{dt.datetime.now().time()}] {file} finished processing")
-    print(f"**********[{dt.datetime.now().time()}] All files processed and {numRows} URLs tried after {round((time.time()-absolute_start_time)/3600, 5)} hours")
-                
-                
+
+    # Flush any remaining results
+    if batch_results:
+        df = pd.DataFrame(batch_results, columns=["File", "URL", "Status", "ErrorMessage"])
+        df.to_csv(output_path, index=False, mode='a', header=not os.path.exists(output_path))
+
+    print(f"**********[{dt.datetime.now().time()}] All files processed. {total_checked} URLs checked in {round((time.time() - absolute_start_time) / 3600, 3)} hours", flush=True)
 
 
-url_semaphore = BoundedSemaphore(8)
-numChecked = 0
 if __name__ == "__main__":
     core_count = 8
     root = "" #root path
